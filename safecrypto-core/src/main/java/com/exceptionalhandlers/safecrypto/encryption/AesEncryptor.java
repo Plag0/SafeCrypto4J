@@ -10,9 +10,9 @@ import javax.crypto.spec.SecretKeySpec;
 /**
  * Encrypts and decrypts data using AES in GCM mode.
  *
- * <p>This class provides a simple, safe-by-default interface for symmetric encryption.
- * Callers provide plaintext and a secret key, and the library handles IV generation,
- * encryption configuration, and packaging the result for storage.
+ * <p>This class provides a simple, safe-by-default interface for symmetric encryption. Callers
+ * provide plaintext and a secret key, and the library handles IV generation, encryption
+ * configuration, and packaging the result for storage.
  *
  * <pre>{@code
  * byte[] key = getKeyFromSecureSource();
@@ -39,8 +39,8 @@ import javax.crypto.spec.SecretKeySpec;
  *   <li>Host compromise. An attacker controlling the JVM can access keys in memory.
  * </ul>
  *
- * <p>The stored format ({@code base64IV:base64Ciphertext}) contains everything required
- * to decrypt the payload except the secret key.
+ * <p>The stored format ({@code base64IV:base64Ciphertext}) contains everything required to decrypt
+ * the payload except the secret key.
  */
 public final class AesEncryptor {
 
@@ -106,8 +106,8 @@ public final class AesEncryptor {
   /**
    * Decrypts an encrypted payload produced by {@link #encrypt}.
    *
-   * <p>If the ciphertext has been tampered with, AES-GCM authentication will fail and
-   * an exception will be thrown.
+   * <p>If the ciphertext has been tampered with, AES-GCM authentication will fail and an exception
+   * will be thrown.
    *
    * @param encryptedPayload formatted encrypted string {@code base64IV:base64Ciphertext}
    * @param key AES key used for encryption
@@ -166,8 +166,7 @@ public final class AesEncryptor {
 
     int length = key.length;
     if (!(length == 16 || length == 24 || length == 32)) {
-      throw new IllegalArgumentException(
-          "AES key must be 16, 24, or 32 bytes but was " + length);
+      throw new IllegalArgumentException("AES key must be 16, 24, or 32 bytes but was " + length);
     }
   }
 

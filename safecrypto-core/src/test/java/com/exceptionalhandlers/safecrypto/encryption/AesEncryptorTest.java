@@ -1,6 +1,7 @@
 package com.exceptionalhandlers.safecrypto.encryption;
 
 import static org.junit.jupiter.api.Assertions.*;
+
 import java.security.SecureRandom;
 import org.junit.jupiter.api.Test;
 
@@ -34,9 +35,11 @@ public class AesEncryptorTest {
 
     String encrypted = AesEncryptor.encrypt(plaintext, key);
 
-    assertThrows(RuntimeException.class, () -> {
-      AesEncryptor.decrypt(encrypted, wrongKey);
-    });
+    assertThrows(
+        RuntimeException.class,
+        () -> {
+          AesEncryptor.decrypt(encrypted, wrongKey);
+        });
   }
 
   @Test
@@ -48,9 +51,11 @@ public class AesEncryptorTest {
 
     String tampered = encrypted.substring(0, encrypted.length() - 2) + "AA";
 
-    assertThrows(RuntimeException.class, () -> {
-      AesEncryptor.decrypt(tampered, key);
-    });
+    assertThrows(
+        RuntimeException.class,
+        () -> {
+          AesEncryptor.decrypt(tampered, key);
+        });
   }
 
   @Test
@@ -58,17 +63,21 @@ public class AesEncryptorTest {
     byte[] badKey = new byte[10];
     byte[] plaintext = "Test".getBytes();
 
-    assertThrows(IllegalArgumentException.class, () -> {
-      AesEncryptor.encrypt(plaintext, badKey);
-    });
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          AesEncryptor.encrypt(plaintext, badKey);
+        });
   }
 
   @Test
   void invalidPayloadFormatThrowsException() {
     byte[] key = randomKey();
 
-    assertThrows(IllegalArgumentException.class, () -> {
-      AesEncryptor.decrypt("invalid-format", key);
-    });
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          AesEncryptor.decrypt("invalid-format", key);
+        });
   }
 }
