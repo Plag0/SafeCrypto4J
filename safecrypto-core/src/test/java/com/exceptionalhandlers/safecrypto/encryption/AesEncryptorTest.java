@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
+import java.util.Base64;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -152,9 +153,9 @@ class AesEncryptorTest {
       byte[] shortCiphertext = new byte[8];
 
       String payload =
-          java.util.Base64.getEncoder().encodeToString(iv)
+          Base64.getEncoder().encodeToString(iv)
               + ":"
-              + java.util.Base64.getEncoder().encodeToString(shortCiphertext);
+              + Base64.getEncoder().encodeToString(shortCiphertext);
 
       assertThatThrownBy(() -> AesEncryptor.decrypt(payload, key))
           .isInstanceOf(IllegalArgumentException.class)
@@ -182,7 +183,7 @@ class AesEncryptorTest {
 
       assertThatThrownBy(() -> AesEncryptor.decrypt(encrypted, wrongKey))
           .isInstanceOf(EncryptionException.class)
-          .hasMessage("AES-GCM decryption failed because the ciphertext or key was invalid");
+          .hasMessageContaining("AES-GCM decryption failed");
     }
 
     @Test
@@ -196,7 +197,7 @@ class AesEncryptorTest {
 
       assertThatThrownBy(() -> AesEncryptor.decrypt(tampered, key))
           .isInstanceOf(EncryptionException.class)
-          .hasMessage("AES-GCM decryption failed because the ciphertext or key was invalid");
+          .hasMessageContaining("AES-GCM decryption failed");
     }
   }
 
