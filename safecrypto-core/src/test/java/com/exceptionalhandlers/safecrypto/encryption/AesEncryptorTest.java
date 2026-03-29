@@ -158,7 +158,7 @@ class AesEncryptorTest {
 
       assertThatThrownBy(() -> AesEncryptor.decrypt(payload, key))
           .isInstanceOf(IllegalArgumentException.class)
-          .hasMessage("ciphertext is too short to be valid");
+          .hasMessage("ciphertext is too short");
     }
 
     @Test
