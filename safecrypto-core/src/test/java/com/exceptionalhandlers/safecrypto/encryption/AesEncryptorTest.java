@@ -144,7 +144,7 @@ class AesEncryptorTest {
     }
 
     @Test
-    @DisplayName("throws when ciphertext is too short to be valid")
+    @DisplayName("throws when ciphertext is too short")
     void throwsWhenCiphertextIsTooShort() {
       byte[] key = randomKey(32);
       byte[] iv = new byte[12];
