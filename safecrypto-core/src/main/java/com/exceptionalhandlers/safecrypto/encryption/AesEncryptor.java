@@ -1,8 +1,9 @@
 package com.exceptionalhandlers.safecrypto.encryption;
 
-import com.exceptionalhandlers.safecrypto.password.PasswordHashingException;
+import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.util.Base64;
+import javax.crypto.AEADBadTagException;
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -21,6 +22,9 @@ import javax.crypto.spec.SecretKeySpec;
  * String encrypted = AesEncryptor.encrypt(plaintext, key);
  *
  * byte[] decrypted = AesEncryptor.decrypt(encrypted, key);
+ *
+ * Arrays.fill(plaintext, (byte) 0);
+ * Arrays.fill(key, (byte) 0);
  * }</pre>
  *
  * <h3>Protections</h3>
@@ -70,11 +74,13 @@ public final class AesEncryptor {
    *
    * <p>The returned value contains the IV and ciphertext encoded as Base64.
    *
+   * <p>Zero out the {@code plaintext} and {@code key} arrays after calling this method.
+   *
    * @param plaintext the data to encrypt; must not be {@code null} or empty
    * @param key the AES key; must be 16, 24, or 32 bytes
    * @return formatted encrypted payload {@code base64IV:base64Ciphertext}
    * @throws IllegalArgumentException if inputs are invalid
-   * @throws PasswordHashingException if encryption fails
+   * @throws EncryptionException if the JVM cannot perform AES-GCM encryption
    */
   public static String encrypt(byte[] plaintext, byte[] key) {
     validatePlaintext(plaintext);
@@ -83,12 +89,11 @@ public final class AesEncryptor {
     byte[] iv = new byte[IV_LENGTH_BYTES];
     SECURE_RANDOM.nextBytes(iv);
 
+    SecretKeySpec keySpec = new SecretKeySpec(key, AES_ALGORITHM);
+    GCMParameterSpec gcmSpec = new GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv);
+
     try {
       Cipher cipher = Cipher.getInstance(AES_TRANSFORMATION);
-
-      SecretKeySpec keySpec = new SecretKeySpec(key, AES_ALGORITHM);
-      GCMParameterSpec gcmSpec = new GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv);
-
       cipher.init(Cipher.ENCRYPT_MODE, keySpec, gcmSpec);
 
       byte[] ciphertext = cipher.doFinal(plaintext);
@@ -97,9 +102,8 @@ public final class AesEncryptor {
       String encodedCiphertext = Base64.getEncoder().encodeToString(ciphertext);
 
       return encodedIv + DELIMITER + encodedCiphertext;
-
-    } catch (Exception e) {
-      throw new PasswordHashingException("AES encryption failed", e);
+    } catch (GeneralSecurityException e) {
+      throw new EncryptionException("AES-GCM encryption failed", e);
     }
   }
 
@@ -109,11 +113,13 @@ public final class AesEncryptor {
    * <p>If the ciphertext has been tampered with, AES-GCM authentication will fail and an exception
    * will be thrown.
    *
+   * <p>Zero out the {@code key} array after calling this method.
+   *
    * @param encryptedPayload formatted encrypted string {@code base64IV:base64Ciphertext}
    * @param key AES key used for encryption
    * @return decrypted plaintext
    * @throws IllegalArgumentException if the payload format is invalid
-   * @throws PasswordHashingException if decryption fails
+   * @throws EncryptionException if decryption fails or the authentication check fails
    */
   public static byte[] decrypt(String encryptedPayload, byte[] key) {
     validateEncryptedPayload(encryptedPayload);
@@ -122,7 +128,9 @@ public final class AesEncryptor {
     String[] parts = encryptedPayload.split(DELIMITER, STORED_SEGMENT_COUNT);
     if (parts.length != STORED_SEGMENT_COUNT) {
       throw new IllegalArgumentException(
-          "Encrypted payload must contain exactly " + STORED_SEGMENT_COUNT + " segments");
+          "encrypted payload must contain exactly "
+              + STORED_SEGMENT_COUNT
+              + " colon-separated segments");
     }
 
     byte[] iv = decodeBase64Segment(parts[0], "IV");
@@ -131,19 +139,22 @@ public final class AesEncryptor {
     }
 
     byte[] ciphertext = decodeBase64Segment(parts[1], "ciphertext");
+    if (ciphertext.length < GCM_TAG_LENGTH_BITS / Byte.SIZE) {
+      throw new IllegalArgumentException("ciphertext is too short");
+    }
+
+    SecretKeySpec keySpec = new SecretKeySpec(key, AES_ALGORITHM);
+    GCMParameterSpec gcmSpec = new GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv);
 
     try {
       Cipher cipher = Cipher.getInstance(AES_TRANSFORMATION);
-
-      SecretKeySpec keySpec = new SecretKeySpec(key, AES_ALGORITHM);
-      GCMParameterSpec gcmSpec = new GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv);
-
       cipher.init(Cipher.DECRYPT_MODE, keySpec, gcmSpec);
-
       return cipher.doFinal(ciphertext);
-
-    } catch (Exception e) {
-      throw new PasswordHashingException("AES decryption failed or data integrity check failed", e);
+    } catch (AEADBadTagException e) {
+      throw new EncryptionException(
+          "AES-GCM decryption failed because the ciphertext or key was invalid", e);
+    } catch (GeneralSecurityException e) {
+      throw new EncryptionException("AES-GCM decryption failed", e);
     }
   }
 
