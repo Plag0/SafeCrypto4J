@@ -37,7 +37,7 @@ After building the project you can run the demo to check out some of the functio
 java -jar safecrypto-demo/target/safecrypto-demo.jar
 ```
 
-The demo includes various comparisons between naive Java crypto and using SafeCrypto4J, as well as demonstrations of encryption and password hashing.
+The demo includes various comparisons between naive Java crypto and using SafeCrypto4J, as well as demonstrations of password hashing, encryption, and HMAC integrity.
 
 # Using the modules
 ## Password hashing
