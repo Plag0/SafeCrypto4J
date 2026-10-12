@@ -177,3 +177,7 @@ mvn spotless:apply
 ```
 
 New security-relevant behaviour needs tests for both the success case and the failure cases (wrong key, tampered data, invalid input).
+
+## Licence
+
+SafeCrypto4J is released under the [MIT License](LICENSE). It is provided as is, without warranty of any kind.

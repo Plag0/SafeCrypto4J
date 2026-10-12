@@ -13,6 +13,14 @@
     <description>A misuse-resistant Java security toolkit with safe defaults for password hashing, encryption, and message integrity.</description>
     <url>https://github.com/Plag0/SafeCrypto4J</url>
 
+    <licenses>
+        <license>
+            <name>MIT License</name>
+            <url>https://opensource.org/licenses/MIT</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
     <scm>
         <url>https://github.com/Plag0/SafeCrypto4J</url>
         <connection>scm:git:https://github.com/Plag0/SafeCrypto4J.git</connection>
