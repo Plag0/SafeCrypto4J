@@ -18,10 +18,12 @@ class PasswordHasherTest {
   private static final char[] VALID_PASSWORD = "correct-horse-battery-staple".toCharArray();
   private static final char[] WRONG_PASSWORD = "wrong-password".toCharArray();
 
-  // Used where a syntactically valid stored hash is required but the verification
-  // result is irrelevant, avoiding unnecessary PBKDF2 work in input validation tests.
+  // A well-formed stored hash for tests where the verification result doesn't matter.
   private static final String PLACEHOLDER_STORED_HASH =
-      "600000:aGVsbG8=:aGVsbG8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+      "600000:AAAAAAAAAAAAAAAAAAAAAA==:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+
+  private static final String VALID_SALT = "AAAAAAAAAAAAAAAAAAAAAA==";
+  private static final String VALID_HASH = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 
   @Nested
   @DisplayName("hashPassword()")
@@ -223,6 +225,26 @@ class PasswordHasherTest {
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("hash");
     }
+
+    @Test
+    @DisplayName("throws IllegalArgumentException when the salt is not 16 bytes")
+    void rejectsWrongSaltLength() {
+      String shortSalt = "600000:aGVsbG8=:" + VALID_HASH;
+
+      assertThatThrownBy(() -> PasswordHasher.verifyPassword(VALID_PASSWORD, shortSalt))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("stored salt has invalid length 5");
+    }
+
+    @Test
+    @DisplayName("throws IllegalArgumentException when the hash is not 32 bytes")
+    void rejectsWrongHashLength() {
+      String shortHash = "600000:" + VALID_SALT + ":aGVsbG8=";
+
+      assertThatThrownBy(() -> PasswordHasher.verifyPassword(VALID_PASSWORD, shortHash))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("stored hash has invalid length 5");
+    }
   }
 
   @Nested
@@ -238,6 +260,38 @@ class PasswordHasherTest {
       assertThatThrownBy(() -> PasswordHasher.verifyPassword(VALID_PASSWORD, lowIterationHash))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("minimum");
+    }
+
+    @ParameterizedTest(name = "rejects iteration count {0}")
+    @ValueSource(ints = {10_000_001, Integer.MAX_VALUE})
+    @DisplayName("throws IllegalArgumentException when iteration count is above maximum threshold")
+    void rejectsAboveMaximumIterations(int count) {
+      String hugeIterationHash = count + ":" + VALID_SALT + ":" + VALID_HASH;
+
+      assertThatThrownBy(() -> PasswordHasher.verifyPassword(VALID_PASSWORD, hugeIterationHash))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("maximum");
+    }
+  }
+
+  @Nested
+  @DisplayName("verifyPassword() known-answer test")
+  class VerifyPasswordKnownAnswer {
+
+    /** Computed with Python's {@code hashlib.pbkdf2_hmac} using salt bytes 0x00 to 0x0f. */
+    private static final String KNOWN_STORED_HASH =
+        "600000:AAECAwQFBgcICQoLDA0ODw==:vQEsJl6ePAkxyhIBi+Ju/htdY1W8PHKs+NvAy4EaAQc=";
+
+    @Test
+    @DisplayName("returns true for a hash produced by an independent PBKDF2 implementation")
+    void verifiesIndependentlyComputedHash() {
+      assertThat(PasswordHasher.verifyPassword(VALID_PASSWORD, KNOWN_STORED_HASH)).isTrue();
+    }
+
+    @Test
+    @DisplayName("returns false for the wrong password against the same hash")
+    void rejectsWrongPasswordAgainstKnownHash() {
+      assertThat(PasswordHasher.verifyPassword(WRONG_PASSWORD, KNOWN_STORED_HASH)).isFalse();
     }
   }
 

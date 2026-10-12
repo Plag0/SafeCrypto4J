@@ -6,10 +6,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.HexFormat;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
+/** Tests for {@link AesEncryptor}. */
 @DisplayName("AesEncryptor")
 class AesEncryptorTest {
 
@@ -193,12 +197,112 @@ class AesEncryptorTest {
       byte[] plaintext = "Sensitive data".getBytes(StandardCharsets.UTF_8);
 
       String encrypted = AesEncryptor.encrypt(plaintext, key);
-      String tampered = encrypted.substring(0, encrypted.length() - 2) + "AA";
+      String tampered = flipFirstBit(encrypted, 1);
 
       assertThatThrownBy(() -> AesEncryptor.decrypt(tampered, key))
           .isInstanceOf(EncryptionException.class)
           .hasMessageContaining("AES-GCM decryption failed");
     }
+
+    @Test
+    @DisplayName("throws when the IV is modified")
+    void throwsWhenIvIsModified() {
+      byte[] key = randomKey(32);
+      byte[] plaintext = "Sensitive data".getBytes(StandardCharsets.UTF_8);
+
+      String encrypted = AesEncryptor.encrypt(plaintext, key);
+      String tampered = flipFirstBit(encrypted, 0);
+
+      assertThatThrownBy(() -> AesEncryptor.decrypt(tampered, key))
+          .isInstanceOf(EncryptionException.class)
+          .hasMessageContaining("AES-GCM decryption failed");
+    }
+
+    @Test
+    @DisplayName("throws when key is null or an invalid length")
+    void throwsWhenKeyIsInvalid() {
+      String encrypted =
+          AesEncryptor.encrypt("Sensitive data".getBytes(StandardCharsets.UTF_8), randomKey(32));
+
+      assertThatThrownBy(() -> AesEncryptor.decrypt(encrypted, null))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("key must not be null");
+      assertThatThrownBy(() -> AesEncryptor.decrypt(encrypted, new byte[31]))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("AES key must be 16, 24, or 32 bytes but was 31");
+    }
+  }
+
+  @Nested
+  @DisplayName("generateKey()")
+  class GenerateKey {
+
+    @Test
+    @DisplayName("generates a 32-byte (256-bit) key")
+    void generates32ByteKey() {
+      assertThat(AesEncryptor.generateKey()).hasSize(32);
+    }
+
+    @Test
+    @DisplayName("generates a different key each time")
+    void generatesDifferentKeys() {
+      assertThat(AesEncryptor.generateKey()).isNotEqualTo(AesEncryptor.generateKey());
+    }
+
+    @Test
+    @DisplayName("generates a key that encrypts and decrypts")
+    void generatedKeyRoundTrips() {
+      byte[] key = AesEncryptor.generateKey();
+      byte[] plaintext = "Sensitive data".getBytes(StandardCharsets.UTF_8);
+
+      assertThat(AesEncryptor.decrypt(AesEncryptor.encrypt(plaintext, key), key))
+          .isEqualTo(plaintext);
+    }
+  }
+
+  /** Test cases 3 and 15 from the GCM specification (McGrew and Viega). */
+  @Nested
+  @DisplayName("GCM specification known-answer tests")
+  class KnownAnswers {
+
+    private static final String IV = "cafebabefacedbaddecaf888";
+
+    private static final String PLAINTEXT =
+        "d9313225f88406e5a55909c5aff5269a86a7a9531534f7da2e4c303d8a318a72"
+            + "1c3c0c95956809532fcf0e2449a6b525b16aedf5aa0de657ba637b391aafd255";
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({
+      "test case 3 (AES-128), feffe9928665731c6d6a8f9467308308,"
+          + " 42831ec2217774244b7221b784d0d49ce3aa212f2c02a4e035c17e2329aca12e"
+          + "21d514b25466931c7d8f6a5aac84aa051ba30b396a0aac973d58e091473f5985"
+          + "4d5c2af327cd64a62cf35abd2ba6fab4",
+      "test case 15 (AES-256), feffe9928665731c6d6a8f9467308308feffe9928665731c6d6a8f9467308308,"
+          + " 522dc1f099567d07f47f37a32a84427d643a8cdcbfe5c0c97598a2bd2555d1aa"
+          + "8cb08e48590dbb3da7b08b1056828838c5f61e6393ba7a0abcc9f662898015ad"
+          + "b094dac5d93471bdec1a502270e3cc6c"
+    })
+    @DisplayName("decrypts the published ciphertext and tag")
+    void decryptsPublishedVector(String name, String keyHex, String ciphertextAndTagHex) {
+      HexFormat hex = HexFormat.of();
+      String payload =
+          Base64.getEncoder().encodeToString(hex.parseHex(IV))
+              + ":"
+              + Base64.getEncoder().encodeToString(hex.parseHex(ciphertextAndTagHex));
+
+      byte[] decrypted = AesEncryptor.decrypt(payload, hex.parseHex(keyHex));
+
+      assertThat(hex.formatHex(decrypted)).isEqualTo(PLAINTEXT);
+    }
+  }
+
+  /** Flips the lowest bit of the first byte of one payload segment (0 = IV, 1 = ciphertext). */
+  private static String flipFirstBit(String payload, int segment) {
+    String[] parts = payload.split(":", 2);
+    byte[] bytes = Base64.getDecoder().decode(parts[segment]);
+    bytes[0] ^= 0x01;
+    parts[segment] = Base64.getEncoder().encodeToString(bytes);
+    return parts[0] + ":" + parts[1];
   }
 
   private void assertRoundTrip(int keyLength) {

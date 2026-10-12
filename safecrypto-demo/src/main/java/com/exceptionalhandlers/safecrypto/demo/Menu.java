@@ -32,7 +32,7 @@ public final class Menu {
     return this;
   }
 
-  /** Displays the menu and processes selections until the user exits. */
+  /** Displays the menu and processes selections until the user exits or input ends. */
   public void show() {
     while (true) {
       ConsoleHelper.header(title);
@@ -43,6 +43,9 @@ public final class Menu {
       System.out.println();
       System.out.print("> ");
 
+      if (!scanner.hasNextLine()) {
+        return;
+      }
       String input = scanner.nextLine().trim();
       if (input.equals("0")) {
         return;
@@ -53,8 +56,20 @@ public final class Menu {
         System.out.println();
         System.out.println("Unrecognised option. Try again.");
       } else {
-        chosen.action().run();
+        runScenario(chosen);
       }
+    }
+  }
+
+  /** Runs a scenario, reporting an unexpected exception instead of ending the demo. */
+  private void runScenario(MenuItem item) {
+    try {
+      item.action().run();
+    } catch (RuntimeException e) {
+      System.out.println();
+      System.out.println("The scenario failed unexpectedly:");
+      System.out.println("  " + e.getClass().getSimpleName() + ": " + e.getMessage());
+      ConsoleHelper.pause(scanner);
     }
   }
 

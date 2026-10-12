@@ -24,16 +24,18 @@ import javax.crypto.spec.PBEKeySpec;
  * Arrays.fill(attempt, '\0');
  * }</pre>
  *
- * <h3>Protections</h3>
+ * <h2>Protections</h2>
  *
  * <ul>
  *   <li>Offline dictionary attacks, slowed by the PBKDF2 work factor
  *   <li>Rainbow table attacks, defeated by per-password random salts
  *   <li>Timing attacks, prevented by constant time comparison
+ *   <li>Work factor downgrades, rejected below a minimum iteration count
+ *   <li>Denial of service through a tampered stored hash, rejected above a maximum iteration count
  *   <li>Password retention in JVM memory, reduced via {@code char[]} with explicit clearing
  * </ul>
  *
- * <h3>Out of scope</h3>
+ * <h2>Out of scope</h2>
  *
  * <ul>
  *   <li>Database compromise. An attacker with the hash store can still run an offline attack.
@@ -61,6 +63,9 @@ public final class PasswordHasher {
    * tampered down to a trivially cheap work factor.
    */
   private static final int MINIMUM_ITERATIONS = 100_000;
+
+  /** Maximum iteration count accepted when verifying, so a tampered hash cannot stall a login. */
+  private static final int MAXIMUM_ITERATIONS = 10_000_000;
 
   /** Shared instance. {@link SecureRandom} is thread-safe and avoids repeated seeding. */
   private static final SecureRandom SECURE_RANDOM = new SecureRandom();
@@ -113,7 +118,7 @@ public final class PasswordHasher {
    * @return {@code true} if the password matches the stored hash, {@code false} otherwise
    * @throws IllegalArgumentException if {@code password} or {@code storedHash} is {@code null} or
    *     empty, if {@code storedHash} is not in the expected format, if the encoded iteration count
-   *     is below the minimum threshold, or if the salt or hash segments have invalid lengths
+   *     is outside the permitted range, or if the salt or hash segments have invalid lengths
    * @throws PasswordHashingException if the JVM does not support PBKDF2WithHmacSHA256
    */
   public static boolean verifyPassword(char[] password, String storedHash) {
@@ -123,7 +128,7 @@ public final class PasswordHasher {
     String[] parts = storedHash.split(DELIMITER, STORED_HASH_SEGMENT_COUNT);
     if (parts.length != STORED_HASH_SEGMENT_COUNT) {
       throw new IllegalArgumentException(
-          "Stored hash must contain exactly "
+          "stored hash must contain exactly "
               + STORED_HASH_SEGMENT_COUNT
               + " colon-separated segments");
     }
@@ -192,6 +197,14 @@ public final class PasswordHasher {
               + iterations
               + " is below the minimum permitted value of "
               + MINIMUM_ITERATIONS);
+    }
+
+    if (iterations > MAXIMUM_ITERATIONS) {
+      throw new IllegalArgumentException(
+          "stored hash iteration count "
+              + iterations
+              + " is above the maximum permitted value of "
+              + MAXIMUM_ITERATIONS);
     }
 
     return iterations;

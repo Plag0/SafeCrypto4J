@@ -16,7 +16,7 @@ import javax.crypto.spec.SecretKeySpec;
  * configuration, and packaging the result for storage.
  *
  * <pre>{@code
- * byte[] key = getKeyFromSecureSource();
+ * byte[] key = AesEncryptor.generateKey(); // or load an existing key from a secret store
  * byte[] plaintext = "Sensitive data".getBytes(StandardCharsets.UTF_8);
  *
  * String encrypted = AesEncryptor.encrypt(plaintext, key);
@@ -27,18 +27,23 @@ import javax.crypto.spec.SecretKeySpec;
  * Arrays.fill(key, (byte) 0);
  * }</pre>
  *
- * <h3>Protections</h3>
+ * <h2>Protections</h2>
  *
  * <ul>
  *   <li>Confidentiality through AES encryption
  *   <li>Integrity and authenticity through GCM authentication tags
  *   <li>IV reuse prevention via random IV generation
+ *   <li>Weak hand-made keys, avoided by {@link #generateKey()}
  * </ul>
  *
- * <h3>Out of scope</h3>
+ * <h2>Out of scope</h2>
  *
  * <ul>
- *   <li>Key management. Callers must securely generate and store encryption keys.
+ *   <li>Key management. Callers must store, distribute and rotate encryption keys securely.
+ *   <li>Key wear-out. Random 12-byte IVs are safe for about 2<sup>32</sup> (4 billion) encryptions
+ *       under one key; rotate keys well before that.
+ *   <li>Context binding. A payload is not tied to where it is stored, so an attacker who can swap
+ *       two payloads encrypted under the same key will not be detected.
  *   <li>Transport security. Data should still be transmitted over TLS.
  *   <li>Host compromise. An attacker controlling the JVM can access keys in memory.
  * </ul>
@@ -50,6 +55,9 @@ public final class AesEncryptor {
 
   private static final String AES_ALGORITHM = "AES";
   private static final String AES_TRANSFORMATION = "AES/GCM/NoPadding";
+
+  /** Length of keys made by {@link #generateKey()} (AES-256). */
+  private static final int GENERATED_KEY_LENGTH_BYTES = 32;
 
   /** AES-GCM standard IV length. */
   private static final int IV_LENGTH_BYTES = 12;
@@ -63,11 +71,23 @@ public final class AesEncryptor {
   /** Expected number of segments in the stored encrypted string. */
   private static final int STORED_SEGMENT_COUNT = 2;
 
-  /** Shared SecureRandom instance for IV generation. */
+  /** Shared SecureRandom instance for key and IV generation. */
   private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
   // Non-instantiable utility class.
   private AesEncryptor() {}
+
+  /**
+   * Generates a random 256-bit AES key. Store it securely, never in source code, and zero the array
+   * when finished with it.
+   *
+   * @return a new 32-byte AES key
+   */
+  public static byte[] generateKey() {
+    byte[] key = new byte[GENERATED_KEY_LENGTH_BYTES];
+    SECURE_RANDOM.nextBytes(key);
+    return key;
+  }
 
   /**
    * Encrypts plaintext using AES-GCM with a randomly generated IV.

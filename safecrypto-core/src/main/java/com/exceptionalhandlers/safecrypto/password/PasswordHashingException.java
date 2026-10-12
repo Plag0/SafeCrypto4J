@@ -1,12 +1,14 @@
 package com.exceptionalhandlers.safecrypto.password;
 
+import com.exceptionalhandlers.safecrypto.SafeCryptoException;
+
 /**
  * Thrown when a cryptographic operation in {@link PasswordHasher} fails due to a JVM configuration
  * problem, such as the required algorithm not being available.
  *
  * <p>This is an unchecked exception because callers cannot reasonably recover from it at runtime.
  */
-public final class PasswordHashingException extends RuntimeException {
+public final class PasswordHashingException extends SafeCryptoException {
 
   /**
    * @param message a description of the failure

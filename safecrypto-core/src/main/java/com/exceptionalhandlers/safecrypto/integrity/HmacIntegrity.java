@@ -8,16 +8,15 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
 /**
- * Provides safe-by-default HMAC message-integrity operations.
+ * Signs and verifies messages using HMAC, a keyed hash that proves data has not been altered.
  *
  * <p>HMAC authenticates data using a shared secret key. It provides integrity and authenticity, but
- * does not provide confidentiality or prevent replay.
- *
- * <p>Example:
+ * not confidentiality: the message itself is not hidden. Use {@code AesEncryptor} when the data
+ * must also be kept secret.
  *
  * <pre>{@code
  * try (HmacIntegrity.Key key = HmacIntegrity.generateKey()) {
- *   byte[] message = "important data 👩‍❤️‍👩️".getBytes(StandardCharsets.UTF_8);
+ *   byte[] message = "important data".getBytes(StandardCharsets.UTF_8);
  *   byte[] tag = HmacIntegrity.sign(key, message);
  *
  *   if (!HmacIntegrity.verify(key, message, tag)) {
@@ -26,42 +25,55 @@ import javax.crypto.spec.SecretKeySpec;
  * }
  * }</pre>
  *
- * <p>Protections implemented:
+ * <p>Tags are raw bytes. Encode them (for example with Base64) to store them as text, and verify
+ * with the same algorithm they were signed with, because a tag does not record its algorithm.
+ *
+ * <h2>Protections</h2>
  *
  * <ul>
- *   <li>Uses HMAC rather than an unkeyed hash for authentication.
- *   <li>Uses SHA-512 by default.
- *   <li>Allows only SHA-256, SHA-384, and SHA-512 HMAC algorithms.
- *   <li>Requires keys to contain at least 256 bits of material.
- *   <li>Copies caller-provided key material.
- *   <li>Clears internal and temporary key-material arrays when possible.
- *   <li>Compares verification tags using a constant-time comparison.
- *   <li>Rejects tags with an unexpected length before comparison.
+ *   <li>Forgery, prevented by a keyed construction rather than a plain hash
+ *   <li>Weak algorithms, prevented by allowing only HMAC with SHA-256, SHA-384 or SHA-512
+ *   <li>Short keys, rejected below {@value Key#KEY_LENGTH_MIN} bytes
+ *   <li>Timing attacks, prevented by constant-time tag comparison
+ *   <li>Truncated tags, rejected by requiring the algorithm's full tag length
+ *   <li>Key retention in JVM memory, reduced by clearing key material when a key is closed
  * </ul>
  *
- * <p>Out of scope:
+ * <h2>Out of scope</h2>
  *
  * <ul>
- *   <li>Encryption or confidentiality.
- *   <li>Key storage, persistence, rotation, or distribution.
- *   <li>Replay protection, freshness, timestamps, or nonce management.
- *   <li>Canonicalization or serialization of messages.
- *   <li>Protection against compromised hosts, memory inspection, or misuse of an already-exposed
- *       key.
+ *   <li>Confidentiality. Encrypt the data if it must be kept secret.
+ *   <li>Key management. Callers must store, distribute and rotate keys securely.
+ *   <li>Replay. A valid message and tag can be resent; include a timestamp or counter in the
+ *       message if that matters.
+ *   <li>Canonicalisation. The caller decides how a message is serialised to bytes, and must do so
+ *       the same way when signing and verifying.
+ *   <li>Host compromise. An attacker controlling the JVM can read keys in memory, including copies
+ *       held by the Java crypto provider.
  * </ul>
  */
 public final class HmacIntegrity {
+
+  /**
+   * Algorithm used when none is given. Tags must be verified with the algorithm that signed them.
+   */
   public static final Algorithm DEFAULT_ALGORITHM = Algorithm.SHA512;
+
+  /** RFC 2104 recommends keys at least as long as the hash output: 64 bytes for SHA-512. */
+  private static final int GENERATED_KEY_LENGTH_BYTES = 64;
 
   private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
-  private HmacIntegrity() {
-    // This class shouldn't be instantiated.
-  }
+  // Non-instantiable utility class.
+  private HmacIntegrity() {}
 
+  /** The HMAC algorithms this library allows. */
   public enum Algorithm {
+    /** HMAC-SHA256, producing 32-byte tags. */
     SHA256("HmacSHA256", 32),
+    /** HMAC-SHA384, producing 48-byte tags. */
     SHA384("HmacSHA384", 48),
+    /** HMAC-SHA512, producing 64-byte tags. This is the {@linkplain #DEFAULT_ALGORITHM default}. */
     SHA512("HmacSHA512", 64);
 
     private final String jcaName;
@@ -76,20 +88,28 @@ public final class HmacIntegrity {
       return jcaName;
     }
 
-    int tagLengthBytes() {
+    /**
+     * Returns the tag length. {@code verify} rejects tags of any other length.
+     *
+     * @return the tag length in bytes
+     */
+    public int tagLengthBytes() {
       return tagLengthBytes;
     }
   }
 
   /**
-   * A protected key for HMAC signing.
+   * A secret key for HMAC signing.
    *
-   * <p>Call {@link #close()} when the key is no longer needed.
+   * <p>Close the key when finished, ideally with try-with-resources. Closing zeroes the key
+   * material and any later use throws {@link IntegrityException}. Keys are thread-safe.
    */
   public static final class Key implements AutoCloseable {
+
+    /** Minimum key material length in bytes. */
     public static final int KEY_LENGTH_MIN = 32;
 
-    private byte[] material;
+    private final byte[] material;
     private boolean closed;
 
     private Key(byte[] material) {
@@ -97,63 +117,63 @@ public final class HmacIntegrity {
     }
 
     /**
-     * Creates an HMAC key from raw key material.
+     * Creates an HMAC key from existing key material. The material is copied, so clear the caller's
+     * array afterwards. Use {@link HmacIntegrity#generateKey()} for new keys.
      *
      * @param keyMaterial the raw key material; it is copied
      * @return a new HMAC key
-     * @throws IllegalArgumentException if {@code keyMaterial} is {@code null} or if the key
-     *     contains fewer than {@value #KEY_LENGTH_MIN} bytes
+     * @throws IllegalArgumentException if {@code keyMaterial} is {@code null} or contains fewer
+     *     than {@value #KEY_LENGTH_MIN} bytes
      */
     public static Key of(byte[] keyMaterial) {
       if (keyMaterial == null) {
         throw new IllegalArgumentException("keyMaterial must not be null");
       }
-
       if (keyMaterial.length < KEY_LENGTH_MIN) {
-        throw new IllegalArgumentException("HMAC keys must contain at least 32 bytes");
+        throw new IllegalArgumentException(
+            "HMAC keys must contain at least " + KEY_LENGTH_MIN + " bytes");
       }
 
       return new Key(keyMaterial);
     }
 
     /**
-     * Extracts key material.
-     *
-     * <p>Ensure that you clear these bytes after you're done with them.
+     * Returns a copy of the key material. Clear the returned array when finished with it.
      *
      * @return a copy of the key material
      * @throws IntegrityException if this key has been closed
      */
-    public byte[] copyMaterial() {
-      if (this.closed) {
+    public synchronized byte[] copyMaterial() {
+      if (closed) {
         throw new IntegrityException("HMAC key has been closed", null);
       }
 
       return material.clone();
     }
 
+    /** Zeroes the key material. Has no effect if the key is already closed. */
     @Override
-    public void close() {
-      if (!this.closed) {
+    public synchronized void close() {
+      if (!closed) {
         Arrays.fill(material, (byte) 0);
-        this.closed = true;
+        closed = true;
       }
     }
   }
 
   /**
-   * Generates a cryptographically random HMAC key.
+   * Generates a random HMAC key.
    *
-   * @return a new randomly generated HMAC key
+   * @return a new 64-byte HMAC key
    */
   public static Key generateKey() {
-    byte[] key = new byte[32];
+    byte[] material = new byte[GENERATED_KEY_LENGTH_BYTES];
 
     try {
-      SECURE_RANDOM.nextBytes(key);
-      return Key.of(key);
+      SECURE_RANDOM.nextBytes(material);
+      return Key.of(material);
     } finally {
-      Arrays.fill(key, (byte) 0);
+      Arrays.fill(material, (byte) 0);
     }
   }
 
@@ -161,11 +181,10 @@ public final class HmacIntegrity {
    * Computes an HMAC tag using {@link #DEFAULT_ALGORITHM}.
    *
    * @param key the HMAC key
-   * @param message the message to sign
+   * @param message the message to sign; may be empty
    * @return a newly allocated HMAC tag
    * @throws IllegalArgumentException if {@code key} or {@code message} is {@code null}
-   * @throws IntegrityException if the key has been closed or the required cryptographic algorithm
-   *     is unavailable
+   * @throws IntegrityException if the key has been closed or the required algorithm is unavailable
    */
   public static byte[] sign(Key key, byte[] message) {
     return sign(key, message, DEFAULT_ALGORITHM);
@@ -175,12 +194,11 @@ public final class HmacIntegrity {
    * Computes an HMAC tag using a specific algorithm.
    *
    * @param key the HMAC key
-   * @param message the message to sign
+   * @param message the message to sign; may be empty
    * @param algorithm the HMAC algorithm to use
-   * @return a newly allocated HMAC tag
+   * @return a newly allocated HMAC tag of {@link Algorithm#tagLengthBytes()} bytes
    * @throws IllegalArgumentException if any argument is {@code null}
-   * @throws IntegrityException if the key has been closed or the required cryptographic algorithm
-   *     is unavailable
+   * @throws IntegrityException if the key has been closed or the required algorithm is unavailable
    */
   public static byte[] sign(Key key, byte[] message, Algorithm algorithm) {
     if (algorithm == null) {
@@ -208,12 +226,11 @@ public final class HmacIntegrity {
    *
    * @param key the HMAC key
    * @param message the message to verify
-   * @param expectedTag a previously signed tag to check against
-   * @return {@code true} only if the tag is valid and has the expected length
+   * @param expectedTag a tag previously returned by {@link #sign(Key, byte[])}
+   * @return {@code true} if the tag matches the message, {@code false} otherwise
    * @throws IllegalArgumentException if any argument is {@code null}, or if {@code expectedTag} is
-   *     empty
-   * @throws IntegrityException if the key has been closed or the required cryptographic algorithm
-   *     is unavailable
+   *     not exactly the default algorithm's tag length
+   * @throws IntegrityException if the key has been closed or the required algorithm is unavailable
    */
   public static boolean verify(Key key, byte[] message, byte[] expectedTag) {
     return verify(key, message, expectedTag, DEFAULT_ALGORITHM);
@@ -222,17 +239,17 @@ public final class HmacIntegrity {
   /**
    * Verifies an HMAC tag using a specific algorithm.
    *
-   * <p>The tag must have been created using the same algorithm.
+   * <p>Compares in constant time. A tag of the wrong length throws instead of returning {@code
+   * false}, as it is malformed rather than mismatched.
    *
    * @param key the HMAC key
    * @param message the message to verify
-   * @param expectedTag a previously signed tag to check against
-   * @param algorithm the HMAC algorithm to use
-   * @return {@code true} only if the tag is valid and has the expected length
+   * @param expectedTag a tag previously signed with the same key and algorithm
+   * @param algorithm the HMAC algorithm the tag was signed with
+   * @return {@code true} if the tag matches the message, {@code false} otherwise
    * @throws IllegalArgumentException if any argument is {@code null}, or if {@code expectedTag} is
-   *     empty
-   * @throws IntegrityException if the key has been closed or the required cryptographic algorithm
-   *     is unavailable
+   *     not exactly {@link Algorithm#tagLengthBytes()} bytes long
+   * @throws IntegrityException if the key has been closed or the required algorithm is unavailable
    */
   public static boolean verify(Key key, byte[] message, byte[] expectedTag, Algorithm algorithm) {
     if (algorithm == null) {
@@ -246,7 +263,12 @@ public final class HmacIntegrity {
     }
     if (expectedTag.length != algorithm.tagLengthBytes()) {
       throw new IllegalArgumentException(
-          "expectedTag was not the correct length for this algorithm");
+          "expectedTag must be "
+              + algorithm.tagLengthBytes()
+              + " bytes for "
+              + algorithm
+              + " but was "
+              + expectedTag.length);
     }
 
     byte[] actualTag = sign(key, message, algorithm);
@@ -260,10 +282,6 @@ public final class HmacIntegrity {
       mac.init(new SecretKeySpec(keyBytes, algorithm.jcaName()));
       return mac;
     } catch (GeneralSecurityException e) {
-      // the javax.crypto.Mac docs say that the runtime must support at least:
-      // - HmacMD5
-      // - HmacSHA1
-      // - HmacSHA256
       throw new IntegrityException(
           "Required HMAC algorithm is unavailable: " + algorithm.jcaName(), e);
     }
