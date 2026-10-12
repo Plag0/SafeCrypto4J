@@ -2,6 +2,7 @@ package com.exceptionalhandlers.safecrypto.demo;
 
 import com.exceptionalhandlers.safecrypto.demo.scenarios.ComparisonScenarios;
 import com.exceptionalhandlers.safecrypto.demo.scenarios.EncryptionScenarios;
+import com.exceptionalhandlers.safecrypto.demo.scenarios.IntegrityScenarios;
 import com.exceptionalhandlers.safecrypto.demo.scenarios.PasswordScenarios;
 import java.util.Scanner;
 
@@ -34,10 +35,20 @@ public final class DemoApp {
               .add("Reject invalid key length", () -> EncryptionScenarios.invalidKeyLength(scanner))
               .add("Show IV uniqueness", () -> EncryptionScenarios.ivUniqueness(scanner));
 
+      Menu integrityMenu =
+          new Menu("Integrity scenarios", "Back", scanner)
+              .add("Sign and verify a message", () -> IntegrityScenarios.signAndVerify(scanner))
+              .add("Verify a tampered message", () -> IntegrityScenarios.tamperedMessage(scanner))
+              .add("Verify with the wrong key", () -> IntegrityScenarios.wrongKey(scanner))
+              .add("Reject a short key", () -> IntegrityScenarios.shortKey(scanner))
+              .add("Reject a truncated tag", () -> IntegrityScenarios.truncatedTag(scanner))
+              .add("Use a closed key", () -> IntegrityScenarios.closedKey(scanner));
+
       new Menu("SafeCrypto4J Demo", "Exit", scanner)
           .add("Compare naive Java crypto vs SafeCrypto4J", () -> ComparisonScenarios.run(scanner))
           .add("Password hashing scenarios", passwordMenu::show)
           .add("Encryption scenarios", encryptionMenu::show)
+          .add("Integrity scenarios", integrityMenu::show)
           .show();
 
       System.out.println();
