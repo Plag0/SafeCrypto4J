@@ -2,6 +2,7 @@ package com.exceptionalhandlers.safecrypto.password;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.exceptionalhandlers.safecrypto.SafeCryptoException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -25,5 +26,12 @@ class PasswordHashingExceptionTest {
     PasswordHashingException ex = new PasswordHashingException("msg", cause);
 
     assertThat(ex.getCause()).isSameAs(cause);
+  }
+
+  @Test
+  @DisplayName("is a SafeCryptoException")
+  void isSafeCryptoException() {
+    assertThat(new PasswordHashingException("msg", new Exception()))
+        .isInstanceOf(SafeCryptoException.class);
   }
 }

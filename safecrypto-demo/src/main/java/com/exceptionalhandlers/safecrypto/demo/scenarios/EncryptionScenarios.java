@@ -4,7 +4,7 @@ import com.exceptionalhandlers.safecrypto.demo.ConsoleHelper;
 import com.exceptionalhandlers.safecrypto.encryption.AesEncryptor;
 import com.exceptionalhandlers.safecrypto.encryption.EncryptionException;
 import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Scanner;
 
@@ -12,7 +12,6 @@ import java.util.Scanner;
 public final class EncryptionScenarios {
 
   private static final String DEMO_PLAINTEXT = "this is a secret message";
-  private static final SecureRandom RANDOM = new SecureRandom();
 
   private EncryptionScenarios() {}
 
@@ -24,19 +23,25 @@ public final class EncryptionScenarios {
     System.out.println("  original bytes using the same key.");
     System.out.println();
     System.out.println("Code:");
+    System.out.println("  byte[] key = AesEncryptor.generateKey();");
     System.out.println("  byte[] plaintext = \"" + DEMO_PLAINTEXT + "\".getBytes(UTF_8);");
     System.out.println("  String encrypted = AesEncryptor.encrypt(plaintext, key);");
     System.out.println("  byte[] decrypted = AesEncryptor.decrypt(encrypted, key);");
+    System.out.println("  Arrays.fill(key, (byte) 0); // clear the key once finished");
     System.out.println();
 
-    byte[] key = randomKey();
+    byte[] key = AesEncryptor.generateKey();
     byte[] plaintext = DEMO_PLAINTEXT.getBytes(StandardCharsets.UTF_8);
     String encrypted = AesEncryptor.encrypt(plaintext, key);
     byte[] decrypted = AesEncryptor.decrypt(encrypted, key);
+    Arrays.fill(key, (byte) 0);
 
     System.out.println("Result:");
     System.out.println("  Encrypted: " + encrypted);
     System.out.println("  Decrypted: " + new String(decrypted, StandardCharsets.UTF_8));
+    System.out.println();
+    System.out.println("  The encrypted string holds the IV and ciphertext, so it can be");
+    System.out.println("  stored as-is. Only the key must be kept secret.");
 
     ConsoleHelper.pause(scanner);
   }
@@ -53,8 +58,8 @@ public final class EncryptionScenarios {
     System.out.println("  AesEncryptor.decrypt(encrypted, wrongKey);");
     System.out.println();
 
-    byte[] key = randomKey();
-    byte[] wrongKey = randomKey();
+    byte[] key = AesEncryptor.generateKey();
+    byte[] wrongKey = AesEncryptor.generateKey();
     byte[] plaintext = DEMO_PLAINTEXT.getBytes(StandardCharsets.UTF_8);
     String encrypted = AesEncryptor.encrypt(plaintext, key);
 
@@ -86,7 +91,7 @@ public final class EncryptionScenarios {
     System.out.println("  AesEncryptor.decrypt(tampered, key);");
     System.out.println();
 
-    byte[] key = randomKey();
+    byte[] key = AesEncryptor.generateKey();
     byte[] plaintext = DEMO_PLAINTEXT.getBytes(StandardCharsets.UTF_8);
     String encrypted = AesEncryptor.encrypt(plaintext, key);
     String tampered = flipFirstCiphertextByte(encrypted);
@@ -147,7 +152,7 @@ public final class EncryptionScenarios {
     System.out.println("  String second = AesEncryptor.encrypt(plaintext, key);");
     System.out.println();
 
-    byte[] key = randomKey();
+    byte[] key = AesEncryptor.generateKey();
     byte[] plaintext = DEMO_PLAINTEXT.getBytes(StandardCharsets.UTF_8);
     String first = AesEncryptor.encrypt(plaintext, key);
     String second = AesEncryptor.encrypt(plaintext, key);
@@ -163,12 +168,6 @@ public final class EncryptionScenarios {
     System.out.println("  two encrypted values came from the same plaintext.");
 
     ConsoleHelper.pause(scanner);
-  }
-
-  private static byte[] randomKey() {
-    byte[] key = new byte[32];
-    RANDOM.nextBytes(key);
-    return key;
   }
 
   /** Flips the first byte of the ciphertext segment, leaving the IV segment unchanged. */

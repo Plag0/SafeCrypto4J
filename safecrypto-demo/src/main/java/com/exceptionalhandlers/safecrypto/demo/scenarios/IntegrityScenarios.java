@@ -14,10 +14,8 @@ public final class IntegrityScenarios {
   private static final String DEMO_MESSAGE = "transfer $100 to account 12345";
   private static final String TAMPERED_MESSAGE = "transfer $900 to account 12345";
 
-  /** Key material length used by the short key scenario, below {@code Key.KEY_LENGTH_MIN}. */
   private static final int SHORT_KEY_LENGTH = 16;
 
-  /** Number of bytes kept by the truncated tag scenario. */
   private static final int TRUNCATED_TAG_LENGTH = 8;
 
   private IntegrityScenarios() {}
@@ -128,7 +126,8 @@ public final class IntegrityScenarios {
     byte[] shortMaterial = new byte[SHORT_KEY_LENGTH];
 
     System.out.println("Result:");
-    try (HmacIntegrity.Key key = HmacIntegrity.Key.of(shortMaterial)) {
+    try {
+      HmacIntegrity.Key.of(shortMaterial).close();
       System.out.println("  Key creation returned without throwing (unexpected!)");
     } catch (IllegalArgumentException e) {
       System.out.println("  " + e.getClass().getSimpleName() + ": " + e.getMessage());
@@ -214,7 +213,6 @@ public final class IntegrityScenarios {
     ConsoleHelper.pause(scanner);
   }
 
-  /** Formats an algorithm the way it is usually written, for example {@code HMAC-SHA512}. */
   static String algorithmName(HmacIntegrity.Algorithm algorithm) {
     return "HMAC-" + algorithm.name();
   }

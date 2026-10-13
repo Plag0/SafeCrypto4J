@@ -58,6 +58,27 @@ public final class ComparisonScenarios {
     System.out.println("    - Fresh random 12-byte IV per call");
     System.out.println("    - GCM authentication tag detects tampered ciphertext");
 
+    ConsoleHelper.subheader("Key handling: unsafe");
+    System.out.println();
+    System.out.println("  byte[] key = \"MySecretKey12345\".getBytes();");
+    System.out.println();
+    System.out.println("  Problems:");
+    System.out.println("    - The key is stored in source code, so anyone with the code or");
+    System.out.println("      the compiled jar can read it, and it ends up in version control");
+    System.out.println("    - A typed phrase has far less randomness than a real 128-bit key");
+    System.out.println("    - The same key is shared by every installation of the program");
+
+    ConsoleHelper.subheader("Key handling: safe");
+    System.out.println();
+    System.out.println("  byte[] key = AesEncryptor.generateKey();");
+    System.out.println("  // save it once to a secret manager or key store, then load it");
+    System.out.println("  // from there at runtime");
+    System.out.println();
+    System.out.println("  SafeCrypto4J handles:");
+    System.out.println("    - 256-bit keys from a cryptographically secure random generator");
+    System.out.println("    - Rejecting AES keys that are not 16, 24 or 32 bytes");
+    System.out.println("  You remain responsible for storing and rotating keys securely.");
+
     ConsoleHelper.subheader("Message integrity: unsafe");
     System.out.println();
     System.out.println("  MessageDigest md = MessageDigest.getInstance(\"SHA-256\");");

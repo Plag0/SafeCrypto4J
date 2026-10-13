@@ -1,12 +1,14 @@
 package com.exceptionalhandlers.safecrypto.encryption;
 
+import com.exceptionalhandlers.safecrypto.SafeCryptoException;
+
 /**
  * Thrown when a cryptographic operation in {@link AesEncryptor} fails due to a JVM configuration
  * problem or decryption/authentication failure.
  *
  * <p>This is an unchecked exception because callers cannot reasonably recover from it at runtime.
  */
-public final class EncryptionException extends RuntimeException {
+public final class EncryptionException extends SafeCryptoException {
 
   /**
    * @param message a description of the failure

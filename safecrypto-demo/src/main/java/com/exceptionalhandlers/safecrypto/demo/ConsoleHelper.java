@@ -27,10 +27,12 @@ public final class ConsoleHelper {
     System.out.println(title);
   }
 
-  /** Blocks until the user presses enter. */
+  /** Blocks until the user presses enter, or returns if input has ended. */
   public static void pause(Scanner scanner) {
     System.out.println();
     System.out.print("Press enter to continue...");
-    scanner.nextLine();
+    if (scanner.hasNextLine()) {
+      scanner.nextLine();
+    }
   }
 }

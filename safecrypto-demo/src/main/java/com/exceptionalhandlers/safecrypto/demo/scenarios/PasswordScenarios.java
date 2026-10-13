@@ -2,6 +2,7 @@ package com.exceptionalhandlers.safecrypto.demo.scenarios;
 
 import com.exceptionalhandlers.safecrypto.demo.ConsoleHelper;
 import com.exceptionalhandlers.safecrypto.password.PasswordHasher;
+import java.util.Arrays;
 import java.util.Scanner;
 
 /** End-to-end demonstrations of {@link PasswordHasher}. */
@@ -23,15 +24,20 @@ public final class PasswordScenarios {
     System.out.println("  char[] password = \"" + DEMO_PASSWORD + "\".toCharArray();");
     System.out.println("  String stored = PasswordHasher.hashPassword(password);");
     System.out.println("  boolean ok = PasswordHasher.verifyPassword(password, stored);");
+    System.out.println("  Arrays.fill(password, '\\0'); // clear the password once finished");
     System.out.println();
 
     char[] password = DEMO_PASSWORD.toCharArray();
     String stored = PasswordHasher.hashPassword(password);
     boolean ok = PasswordHasher.verifyPassword(password, stored);
+    Arrays.fill(password, '\0');
 
     System.out.println("Result:");
     System.out.println("  Stored hash: " + stored);
     System.out.println("  Verification result: " + ok);
+    System.out.println();
+    System.out.println("  Store the whole string: it records the work factor and salt that");
+    System.out.println("  verification needs. The password itself is never stored.");
 
     ConsoleHelper.pause(scanner);
   }

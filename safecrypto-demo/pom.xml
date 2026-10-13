@@ -6,16 +6,18 @@
     <parent>
         <groupId>com.exceptionalhandlers</groupId>
         <artifactId>SafeCrypto4J</artifactId>
-        <version>1.0-SNAPSHOT</version>
+        <version>1.0.0</version>
     </parent>
 
     <artifactId>safecrypto-demo</artifactId>
+    <name>SafeCrypto4J Demo</name>
+    <description>Interactive command-line demo of SafeCrypto4J. Not intended as a dependency.</description>
 
     <dependencies>
         <dependency>
             <groupId>com.exceptionalhandlers</groupId>
             <artifactId>safecrypto-core</artifactId>
-            <version>1.0-SNAPSHOT</version>
+            <version>${project.version}</version>
         </dependency>
     </dependencies>
 
